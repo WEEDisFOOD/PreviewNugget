@@ -1,0 +1,6 @@
+1. Dependencies
+
+sudo apt-get update -y
+sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libncurses-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libtool autoconf liblmdb-dev -y
+
+curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
