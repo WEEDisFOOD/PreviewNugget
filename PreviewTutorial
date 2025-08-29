@@ -1,6 +1,87 @@
-1. Dependencies
-
+1. Install System Libraries
 sudo apt-get update -y
 sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libncurses-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libtool autoconf liblmdb-dev -y
 
+2. Install Haskell Environment
 curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+
+3. Reboot System
+
+3. Set Preferred Versions for GHC and Cabal
+ghcup install ghc 9.6.7
+ghcup set ghc 9.6.7
+ghcup install cabal 3.12.1.0
+ghcup set cabal 3.12.1.0
+
+4. Choose Node Version
+CARDANO_NODE_VERSION='10.5.1'
+IOHKNIX_VERSION=$(curl https://raw.githubusercontent.com/IntersectMBO/cardano-node/$CARDANO_NODE_VERSION/flake.lock | jq -r '.nodes.iohkNix.locked.rev')
+echo "iohk-nix version: $IOHKNIX_VERSION"
+
+5. Create "Preview" Directories
+mkdir -p ~/preview-src ~/keys ~/preview-src/db ~/preview-src/socket ~/preview-src/share/
+cd preview-src
+
+6. Install Sodium
+SODIUM_VERSION=$(curl https://raw.githubusercontent.com/input-output-hk/iohk-nix/$IOHKNIX_VERSION/flake.lock | jq -r '.nodes.sodium.original.rev')
+echo "Using sodium version: $SODIUM_VERSION"
+
+...then...
+
+: ${SODIUM_VERSION:='dbb48cc'}
+git clone https://github.com/intersectmbo/libsodium
+cd libsodium
+git checkout $SODIUM_VERSION
+./autogen.sh
+./configure
+make
+make check
+sudo make install
+
+7. Set Library and Configuration Paths
+echo 'export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"' >> ~/.bashrc
+echo 'export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+8. Install secp256k1
+SECP256K1_VERSION=$(curl https://raw.githubusercontent.com/input-output-hk/iohk-nix/$IOHKNIX_VERSION/flake.lock | jq -r '.nodes.secp256k1.original.ref')
+echo "Using secp256k1 version: ${SECP256K1_VERSION}"
+
+...then...
+
+: ${SECP256K1_VERSION:='v0.3.2'}
+git clone --depth 1 --branch ${SECP256K1_VERSION} https://github.com/bitcoin-core/secp256k1
+cd secp256k1
+./autogen.sh
+./configure --enable-module-schnorrsig --enable-experimental
+make
+make check
+sudo make install
+
+9. Install BLST
+BLST_VERSION=$(curl https://raw.githubusercontent.com/input-output-hk/iohk-nix/$IOHKNIX_VERSION/flake.lock | jq -r '.nodes.blst.original.ref')
+echo "Using blst version: ${BLST_VERSION}"
+
+...then...
+
+: ${BLST_VERSION:='v0.3.11'}
+git clone --depth 1 --branch ${BLST_VERSION} https://github.com/supranational/blst
+cd blst
+./build.sh
+cat > libblst.pc << EOF
+prefix=/usr/local
+exec_prefix=\${prefix}
+libdir=\${exec_prefix}/lib
+includedir=\${prefix}/include
+
+Name: libblst
+Description: Multilingual BLS12-381 signature library
+URL: https://github.com/supranational/blst
+Version: ${BLST_VERSION#v}
+Cflags: -I\${includedir}
+Libs: -L\${libdir} -lblst
+EOF
+sudo cp libblst.pc /usr/local/lib/pkgconfig/
+sudo cp bindings/blst_aux.h bindings/blst.h bindings/blst.hpp  /usr/local/include/
+sudo cp libblst.a /usr/local/lib
+sudo chmod u=rw,go=r /usr/local/{lib/{libblst.a,pkgconfig/libblst.pc},include/{blst.{h,hpp},blst_aux.h}}
