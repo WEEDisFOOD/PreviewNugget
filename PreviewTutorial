@@ -85,3 +85,71 @@ sudo cp libblst.pc /usr/local/lib/pkgconfig/
 sudo cp bindings/blst_aux.h bindings/blst.h bindings/blst.hpp  /usr/local/include/
 sudo cp libblst.a /usr/local/lib
 sudo chmod u=rw,go=r /usr/local/{lib/{libblst.a,pkgconfig/libblst.pc},include/{blst.{h,hpp},blst_aux.h}}
+
+10. Create 'startnode.sh' Executable
+cd ~
+echo '#!/bin/bash
+
+# Configuration variables
+TOPOLOGY_FILE="${HOME}/preview-src/share/preview/topology.json"
+CONFIG_FILE="${HOME}/preview-src/share/preview/config.json"
+DATABASE_PATH="${HOME}/preview-src/db"
+SOCKET_PATH="${HOME}/preview-src/socket/node.socket"
+HOST_ADDR="0.0.0.0"
+PORT="6002"
+
+cardano-node run \
+    --topology "${TOPOLOGY_FILE}" \
+    --database-path "${DATABASE_PATH}" \
+    --socket-path "${SOCKET_PATH}" \
+    --host-addr "${HOST_ADDR}" \
+    --port "${PORT}" \
+    --config "${CONFIG_FILE}" ' > startnode.sh
+sudo chmod 755 startnode.sh
+
+11. Set up a Linux Service for the Node
+sudo cat > cardano-node.service << EOF
+[Unit]
+Description       = Cardano Node Service
+Wants             = network-online.target
+After             = network-online.target
+
+[Service]
+User=$(whoami)
+Type=simple
+WorkingDirectory=/home/$(whoami)
+ExecStart=/home/$(whoami)/startnode.sh
+KillSignal=SIGINT
+RestartKillSignal=SIGINT
+TimeoutStopSec=300
+LimitNOFILE=32768
+Restart=always
+RestartSec=5
+SyslogIdentifier=cardano-node
+
+[Install]
+WantedBy          = multi-user.target
+EOF
+sudo mv cardano-node.service /etc/systemd/system
+
+12. Activate the Service
+sudo systemctl daemon-reload
+sudo systemctl enable cardano-node.service
+
+13. Download Cardano Node Source Code
+git clone https://github.com/intersectmbo/cardano-node.git
+
+14. Enter the New 'cardano-node' Directory
+cd cardano-node
+
+15. Check-out the Most Recent Node Version
+git tag | sort -V
+git switch -d tags/<TAGGED VERSION>
+
+16. Build/Install the Node
+cabal update
+cabal build exe:cardano-node
+cabal build exe:cardano-cli
+
+13.
+sudo systemctl start cardano-node.service
